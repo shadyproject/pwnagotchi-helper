@@ -6,40 +6,42 @@ import scapy.layers.dot11
 
 
 def sick_logo():
-    print('''
- _______                                                    __              __       __        ________                 __          
-|       \                                                  |  \            |  \     |  \      |        \               |  \         
-| $$$$$$$\__   __   __ _______   ______   ______   ______ _| $$_    _______| $$____  \$$       \$$$$$$$______   ______ | $$ _______ 
-| $$__/ $|  \ |  \ |  |       \ |      \ /      \ /      |   $$ \  /       | $$    \|  \         | $$ /      \ /      \| $$/       \
-| $$    $| $$ | $$ | $| $$$$$$$\ \$$$$$$|  $$$$$$|  $$$$$$\$$$$$$ |  $$$$$$| $$$$$$$| $$         | $$|  $$$$$$|  $$$$$$| $|  $$$$$$$
-| $$$$$$$| $$ | $$ | $| $$  | $$/      $| $$  | $| $$  | $$| $$ __| $$     | $$  | $| $$         | $$| $$  | $| $$  | $| $$\$$    \ 
-| $$     | $$_/ $$_/ $| $$  | $|  $$$$$$| $$__| $| $$__/ $$| $$|  | $$_____| $$  | $| $$         | $$| $$__/ $| $$__/ $| $$_\$$$$$$\
-| $$      \$$   $$   $| $$  | $$\$$    $$\$$    $$\$$    $$ \$$  $$\$$     | $$  | $| $$         | $$ \$$    $$\$$    $| $|       $$
- \$$       \$$$$$\$$$$ \$$   \$$ \$$$$$$$_\$$$$$$$ \$$$$$$   \$$$$  \$$$$$$$\$$   \$$\$$          \$$  \$$$$$$  \$$$$$$ \$$\$$$$$$$ 
-                                        |  \__| $$                                                                                  
-                                         \$$    $$                                                                                  
-                                          \$$$$$$                                                                                   
-    ''')
+    print(
+        """
+ ____  ____  ____  ____  ____  ____  ____  ____  ____  ____ 
+||P ||||w ||||n ||||a ||||g ||||o ||||t ||||c ||||h ||||i ||
+||__||||__||||__||||__||||__||||__||||__||||__||||__||||__||
+|/__\||/__\||/__\||/__\||/__\||/__\||/__\||/__\||/__\||/__\|
+ ____  ____  ____  ____  ____  ____                         
+||H ||||e ||||l ||||p ||||e ||||r ||                        
+||__||||__||||__||||__||||__||||__||                        
+|/__\||/__\||/__\||/__\||/__\||/__\|                        
+    """
+    )
 
 
 def build_args():
     p = argparse.ArgumentParser()
     p.add_argument("host", help="ip address or hostname of the pwnagotchi")
-    p.add_argument("-p", "--password", default="raspberry", help="password for pwnagotchi user")
+    p.add_argument(
+        "-p", "--password", default="raspberry", help="password for pwnagotchi user"
+    )
     p.add_argument("-u", "--user", default="pi", help="pwnagotchi ssh user")
-    p.add_argument("-d", "--handshake_dir",
-                   default=os.path.join(os.path.abspath(os.getcwd()), "handshakes"),
-                   help="Directory where handshakes will be copied and processed")
+    p.add_argument(
+        "-d",
+        "--handshake_dir",
+        default=os.path.join(os.path.abspath(os.getcwd()), "handshakes"),
+        help="Directory where handshakes will be copied and processed",
+    )
     return p
 
 
 def transfer_handshakes(user, password, host, path):
     # todo: handle "authenticity of host cannot be established"
     print("Connecting to pwnagotchi")
-    with Connection(f"{user}@{host}",
-                    connect_kwargs={
-                        "look_for_keys": False,
-                        "password": password}) as c:
+    with Connection(
+        f"{user}@{host}", connect_kwargs={"look_for_keys": False, "password": password}
+    ) as c:
         pcap_dir = os.path.join(path, "pcap")
         pi_dir = f"/home/{user}/handshakes"
         c.run(f"rm -rf {pi_dir}")
@@ -67,7 +69,7 @@ def extract_first_bssid(pcap):
 
 
 def ssid_from_filename(filename):
-    pos = filename.rfind('_')
+    pos = filename.rfind("_")
     ssid = filename[pos, len(filename)]
     return ssid
 
@@ -88,4 +90,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     transfer_handshakes(args.user, args.password, args.host, args.handshake_dir)  # type: ignore
-    bssid_list = extract_bssids(os.path.join(args.handshake_dir, 'pcap'))  # type: ignore
+    bssid_list = extract_bssids(os.path.join(args.handshake_dir, "pcap"))  # type: ignore
