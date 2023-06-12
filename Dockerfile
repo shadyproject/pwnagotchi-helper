@@ -1,5 +1,8 @@
 FROM python:3
 
+RUN apt-get -y install aircrack-ng
+RUN apt-get -y install hcxtools
+
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./
