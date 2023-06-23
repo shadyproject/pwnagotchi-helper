@@ -3,6 +3,12 @@ import argparse
 from fabric import Connection
 import scapy.utils
 import scapy.layers.dot11
+import shutil
+
+PCAP_DIR = "pcap"
+PMKID_DIR = "pmkid"
+HCCAP_DIR = "hccapx"
+HANDSHAKE_DIR = "handshakes"
 
 
 def sick_logo():
@@ -30,28 +36,41 @@ def build_args():
     p.add_argument(
         "-d",
         "--handshake_dir",
-        default=os.path.join(os.path.abspath(os.getcwd()), "handshakes"),
+        default=os.path.join(os.path.abspath(os.getcwd()), HANDSHAKE_DIR),
         help="Directory where handshakes will be copied and processed",
     )
     return p
 
 
+def setup_directories(base_dir):
+    if os.path.exists(base_dir):
+        shutil.rmtree(os.path.join(base_dir, PMKID_DIR))
+        shutil.rmtree(os.path.join(base_dir, HCCAP_DIR))
+        shutil.rmtree(os.path.join(base_dir, PCAP_DIR))
+        os.rmdir(base_dir)
+
+    os.makedirs(os.path.join(base_dir, PCAP_DIR))
+    os.makedirs(os.path.join(base_dir, PMKID_DIR))
+    os.makedirs(os.path.join(base_dir, HCCAP_DIR))
+
+
 def transfer_handshakes(user, password, host, path):
     # todo: handle "authenticity of host cannot be established"
+    # todo: handle actual passphrase for a locked keychain/private key
     print("Connecting to pwnagotchi")
     with Connection(
         f"{user}@{host}", connect_kwargs={"look_for_keys": False, "password": password}
     ) as c:
-        pcap_dir = os.path.join(path, "pcap")
+        pcap_dir = os.path.join(path, PCAP_DIR)
         pi_dir = f"/home/{user}/handshakes"
-        c.run(f"rm -rf {pi_dir}")
+        c.run(f"sudo rm -rf {pi_dir}", pty=True)
         print("Copying handshakes from /root/handshakes")
         c.run(f"sudo cp -r /root/handshakes {pi_dir}", pty=True)
-
-        os.mkdir(pcap_dir)
-
+        print("Compressing pcaps prior to downloading")
+        # todo: potentially use the listdit_iter method to pull files one by one instead of using tar
+        c.run(f"tar -zcvf handshakes.tgz {pi_dir}")
         print("Downloading pcaps")
-        c.get(f"{pi_dir}/*", pcap_dir)
+        c.get(f"{pi_dir}/handshakes.tgz", f"{pcap_dir}/handshakes.tgz")
 
 
 # try to do this natively instead of spawning a subprocess to run aircrack-ng
@@ -85,9 +104,11 @@ def extract_bssids(pcap_dir):
 
 
 if __name__ == "__main__":
-    sick_logo()
     parser = build_args()
     args = parser.parse_args()
 
+    sick_logo()
+    setup_directories(args.handshake_dir)
     transfer_handshakes(args.user, args.password, args.host, args.handshake_dir)  # type: ignore
     bssid_list = extract_bssids(os.path.join(args.handshake_dir, "pcap"))  # type: ignore
+    print(bssid_list)
