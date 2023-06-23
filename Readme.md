@@ -11,7 +11,8 @@ Only supports python3, tested on python 3.9 and 3.11
 ## Usage
 
 ```
-python3 -m venv <path>
+python3 -m venv env
+source env/bin/activate
 python3 -m pip install -r requirements.txt
 python3 pwnagotchi-helper.py <ip or hostname of pwnagotchi>
 ```
