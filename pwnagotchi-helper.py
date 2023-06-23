@@ -4,6 +4,7 @@ from fabric import Connection
 import scapy.utils
 import scapy.layers.dot11
 import shutil
+import tarfile
 
 PCAP_DIR = "pcap"
 PMKID_DIR = "pmkid"
@@ -62,15 +63,18 @@ def transfer_handshakes(user, password, host, path):
         f"{user}@{host}", connect_kwargs={"look_for_keys": False, "password": password}
     ) as c:
         pcap_dir = os.path.join(path, PCAP_DIR)
-        pi_dir = f"/home/{user}/handshakes"
-        c.run(f"sudo rm -rf {pi_dir}", pty=True)
+        pi_home = f"/home/{user}"
+        pi_handshakes = f"{pi_home}/{HANDSHAKE_DIR}"
+        c.run(f"sudo rm -rf {pi_handshakes}", pty=True)
         print("Copying handshakes from /root/handshakes")
-        c.run(f"sudo cp -r /root/handshakes {pi_dir}", pty=True)
+        c.run(f"sudo cp -r /root/handshakes {pi_home}", pty=True)
         print("Compressing pcaps prior to downloading")
-        # todo: potentially use the listdit_iter method to pull files one by one instead of using tar
-        c.run(f"tar -zcvf handshakes.tgz {pi_dir}")
+        c.run(f"tar -zcvf handshakes.tgz {pi_handshakes}")
         print("Downloading pcaps")
-        c.get(f"{pi_dir}/handshakes.tgz", f"{pcap_dir}/handshakes.tgz")
+        c.get(f"{pi_home}/handshakes.tgz", f"{pcap_dir}/handshakes.tgz")
+        t = tarfile.open(f"{pcap_dir}/handshakes.tgz", encoding="utf-8")
+        t.extractall(pcap_dir)
+        t.close()
 
 
 # try to do this natively instead of spawning a subprocess to run aircrack-ng
