@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 
 handshakes/*
+.DS_Store
