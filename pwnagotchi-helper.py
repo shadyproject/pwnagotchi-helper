@@ -4,7 +4,6 @@ from fabric import Connection
 import scapy.utils
 import scapy.layers.dot11
 import shutil
-import tarfile
 
 PCAP_DIR = "pcap"
 PMKID_DIR = "pmkid"
@@ -59,22 +58,21 @@ def transfer_handshakes(user, password, host, path):
     # todo: handle "authenticity of host cannot be established"
     # todo: handle actual passphrase for a locked keychain/private key
     print("Connecting to pwnagotchi")
+    pcap_dir = os.path.join(path, PCAP_DIR)
+    pi_home = f"/home/{user}"
+    pi_handshakes = f"{pi_home}/{HANDSHAKE_DIR}"
     with Connection(
         f"{user}@{host}", connect_kwargs={"look_for_keys": False, "password": password}
     ) as c:
-        pcap_dir = os.path.join(path, PCAP_DIR)
-        pi_home = f"/home/{user}"
-        pi_handshakes = f"{pi_home}/{HANDSHAKE_DIR}"
         c.run(f"sudo rm -rf {pi_handshakes}", pty=True)
         print("Copying handshakes from /root/handshakes")
         c.run(f"sudo cp -r /root/handshakes {pi_home}", pty=True)
-        print("Compressing pcaps prior to downloading")
-        c.run(f"tar -zcvf handshakes.tgz {pi_handshakes}")
         print("Downloading pcaps")
-        c.get(f"{pi_home}/handshakes.tgz", f"{pcap_dir}/handshakes.tgz")
-        t = tarfile.open(f"{pcap_dir}/handshakes.tgz", encoding="utf-8")
-        t.extractall(pcap_dir)
-        t.close()
+        with c.sftp() as s:
+            s.chdir(pi_handshakes)
+            for f in s.listdir():
+                print(f"Downloading {f}")
+                s.get(f"{pi_handshakes}/{f}", os.path.join(pcap_dir, f))
 
 
 # try to do this natively instead of spawning a subprocess to run aircrack-ng
@@ -83,7 +81,7 @@ def extract_first_bssid(pcap):
     packets = scapy.utils.rdpcap(pcap)
 
     for p in packets:
-        if p.hasLayer(scapy.layers.dot11.Dot11):
+        if p.haslayer(scapy.layers.dot11.Dot11):
             if p.type == 0 and p.subtype == 8:  # management frame
                 bssid = p[scapy.layers.dot11.Dot11].addr3
                 return bssid
@@ -93,7 +91,7 @@ def extract_first_bssid(pcap):
 
 def ssid_from_filename(filename):
     pos = filename.rfind("_")
-    ssid = filename[pos, len(filename)]
+    ssid = filename[0:pos]
     return ssid
 
 
@@ -114,5 +112,5 @@ if __name__ == "__main__":
     sick_logo()
     setup_directories(args.handshake_dir)
     transfer_handshakes(args.user, args.password, args.host, args.handshake_dir)  # type: ignore
-    bssid_list = extract_bssids(os.path.join(args.handshake_dir, "pcap"))  # type: ignore
+    bssid_list = extract_bssids(os.path.join(args.handshake_dir, PCAP_DIR))  # type: ignore
     print(bssid_list)
