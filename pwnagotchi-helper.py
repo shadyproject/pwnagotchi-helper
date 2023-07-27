@@ -2,7 +2,7 @@ import os
 import argparse
 from fabric import Connection
 import scapy.utils
-import scapy.layers.dot11
+import scapy.layers.dot11 as wifi
 import shutil
 
 PCAP_DIR = "pcap"
@@ -75,15 +75,14 @@ def transfer_handshakes(user, password, host, path):
                 s.get(f"{pi_handshakes}/{f}", os.path.join(pcap_dir, f))
 
 
-# try to do this natively instead of spawning a subprocess to run aircrack-ng
-# todo determine if this actually matches the first bssid returned by aircrack-ng
+# do this natively instead of spawning a subprocess to run aircrack-ng
 def extract_first_bssid(pcap):
     packets = scapy.utils.rdpcap(pcap)
 
     for p in packets:
-        if p.haslayer(scapy.layers.dot11.Dot11):
+        if p.haslayer(wifi.Dot11):
             if p.type == 0 and p.subtype == 8:  # management frame
-                bssid = p[scapy.layers.dot11.Dot11].addr3
+                bssid = p[wifi.Dot11].addr3
                 return bssid
 
     return None
@@ -95,11 +94,59 @@ def ssid_from_filename(filename):
     return ssid
 
 
+def extract_pmkid(packet):
+    # Check if the packet contains 802.11 (Wi-Fi) layer and the required fields
+    if (
+        packet.haslayer(wifi.Dot11)
+        and packet.haslayer(wifi.Dot11.Dot11AssoReq)
+        and packet.haslayer(wifi.Dot11AssoResp)
+    ):
+        # Check if the packet contains the PMKID field (tag type 5)
+        if (
+            5 in packet[wifi.Dot11AssoReq].tagpresent
+            or 5 in packet[wifi.Dot11AssoResp].tagpresent
+        ):
+            # Extract the PMKID value
+            pmkid = (
+                packet[wifi.Dot11AssoReq].pmkidlist[0]
+                if 5 in packet[wifi.Dot11AssoReq].tagpresent
+                else packet[wifi.Dot11AssoResp].pmdklist[0]
+            )
+            return pmkid
+    return None
+
+
+def convert_to_pkmid(pcap_file):
+    print(f"looking for pkmid in {pcap_file}")
+    packets = scapy.utils.rdpcap(pcap_file)
+    for p in packets:
+        pmkid = extract_pmkid(p)
+        if pmkid is not None:
+            print(f"Found pkmid {pmkid} in {pcap_file}")
+            return True
+    return False
+
+
+def convert_to_handshake(pcap_file):
+    print(f"Looking for handshake in {pcap_file}")
+    return False
+
+
+def convert_file(pcap):
+    # first try to convert to pmkid
+    if not convert_to_pkmid(pcap):
+        # then try to find a handshake
+        if not convert_to_handshake(pcap):
+            return False
+    return True
+
+
 def extract_bssids(pcap_dir):
     bssids = {}
     for file in os.scandir(pcap_dir):
         network_name = ssid_from_filename(file.name)
         bssid = extract_first_bssid(file.path)
+        convert_file(file.path)
         if bssid is not None:
             bssids[network_name] = bssid
     return bssids
