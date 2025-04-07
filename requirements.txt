@@ -1,2 +1,2 @@
 Fabric==3.1.0
-scapy==2.5.0
+scapy==2.6.1
